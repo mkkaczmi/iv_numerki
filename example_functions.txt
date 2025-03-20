@@ -1,0 +1,99 @@
+Example Functions for Root Finding
+================================
+
+Polynomial Functions:
+-------------------
+1. x^3 - 2x^2 + 4x - 8
+   Interval: [0, 4]
+   Expected root: ≈ 2
+
+2. x^4 - 3x^2 + 2
+   Interval: [-2, 2]
+   Expected roots: ≈ ±1, ±√2
+
+3. x^5 - 5x^3 + 4x
+   Interval: [-3, 3]
+   Expected roots: 0, ±1, ±2
+
+4. x^2 + 2x + 1
+   Interval: [-2, 0]
+   Expected root: -1
+
+5. x^3 + 3x^2 + 3x + 1
+   Interval: [-2, 0]
+   Expected root: -1
+
+Trigonometric Functions:
+----------------------
+1. sin(x) + cos(x)
+   Interval: [2, 4]
+   Expected root: ≈ 3.927
+
+2. sin(x) - cos(x)
+   Interval: [0, 2]
+   Expected root: ≈ 0.785
+
+3. tan(x) - 1
+   Interval: [0, 2]
+   Expected root: ≈ 0.785
+
+4. sin(x^2)
+   Interval: [1, 2]
+   Expected root: ≈ 1.772
+
+5. cos(x) - sin(x)
+   Interval: [0, 2]
+   Expected root: ≈ 0.785
+
+Exponential Functions:
+--------------------
+1. e^x - 2
+   Interval: [0, 2]
+   Expected root: ≈ 0.693
+
+2. e^(-x) - 0.5
+   Interval: [0, 2]
+   Expected root: ≈ 0.693
+
+3. e^x + e^(-x) - 3
+   Interval: [-1, 1]
+   Expected root: ≈ 0.481
+
+4. e^(2x) - 4
+   Interval: [0, 1]
+   Expected root: ≈ 0.693
+
+5. e^(-x^2) - 0.5
+   Interval: [-1, 1]
+   Expected roots: ≈ ±0.832
+
+Composite Functions:
+------------------
+1. sin(x^2) + e^(-x)
+   Interval: [0, 3]
+   Expected root: ≈ 1.772
+
+2. cos(x) + e^(-x) - 1
+   Interval: [0, 2]
+   Expected root: ≈ 0.739
+
+3. sin(x) + x^2 - 2
+   Interval: [0, 2]
+   Expected root: ≈ 1.061
+
+4. e^(-x) * sin(x) - 0.5
+   Interval: [0, 2]
+   Expected root: ≈ 0.739
+
+5. cos(x^2) + x - 1
+   Interval: [0, 2]
+   Expected root: ≈ 0.739
+
+Notes:
+-----
+1. All intervals are chosen to contain at least one root
+2. Expected roots are approximate values
+3. Some functions may have multiple roots in the given intervals
+4. For best results, choose intervals where the function has opposite signs at endpoints
+5. The epsilon value of 0.000001 (1e-6) is recommended for most cases
+6. Maximum iterations of 100 should be sufficient for most functions 
