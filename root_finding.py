@@ -10,24 +10,24 @@ def bisection_method(
     use_epsilon_condition: bool
 ) -> Tuple[float | None, int]:
     """
-    Find root using bisection method.
+    Znajduje pierwiastek używając metody bisekcji.
     
     Args:
-        f: Function to find root of
-        a: Left endpoint of interval
-        b: Right endpoint of interval
-        epsilon: Tolerance for convergence
-        max_iterations: Maximum number of iterations
-        use_epsilon_condition: If True, use |x_i - x_(i-1)| < ε condition
+        f: Funkcja do znalezienia pierwiastka
+        a: Lewy koniec przedziału
+        b: Prawy koniec przedziału
+        epsilon: Tolerancja zbieżności
+        max_iterations: Maksymalna liczba iteracji
+        use_epsilon_condition: Jeśli True, użyj warunku |x_i - x_(i-1)| < ε
         
     Returns:
-        Tuple of (root or None, number of iterations)
+        Krotka zawierająca (pierwiastek lub None, liczba iteracji)
     """
     try:
         fa = f(a)
         fb = f(b)
     except (ValueError, OverflowError):
-        # Handle case where function is undefined at endpoints
+        # Obsługa przypadku gdy funkcja jest nieokreślona na końcach
         return None, 0
         
     if fa * fb >= 0:
@@ -41,7 +41,7 @@ def bisection_method(
         try:
             fc = f(c)
         except (ValueError, OverflowError):
-            # If function is undefined at midpoint, try a point slightly to the left
+            # Jeśli funkcja jest nieokreślona w punkcie środkowym, spróbuj punktu nieco na lewo
             try:
                 c = c - epsilon
                 fc = f(c)
@@ -80,18 +80,18 @@ def secant_method(
     use_epsilon_condition: bool
 ) -> Tuple[float | None, int]:
     """
-    Find root using secant method.
+    Znajduje pierwiastek używając metody siecznych.
     
     Args:
-        f: Function to find root of
-        x0: First initial point
-        x1: Second initial point
-        epsilon: Tolerance for convergence
-        max_iterations: Maximum number of iterations
-        use_epsilon_condition: If True, use |x_i - x_(i-1)| < ε condition
+        f: Funkcja do znalezienia pierwiastka
+        x0: Pierwszy punkt początkowy
+        x1: Drugi punkt początkowy
+        epsilon: Tolerancja zbieżności
+        max_iterations: Maksymalna liczba iteracji
+        use_epsilon_condition: Jeśli True, użyj warunku |x_i - x_(i-1)| < ε
         
     Returns:
-        Tuple of (root or None, number of iterations)
+        Krotka zawierająca (pierwiastek lub None, liczba iteracji)
     """
     iterations = 0
     x_prev = x0
@@ -113,7 +113,7 @@ def secant_method(
         if abs(f_curr) < epsilon:
             return x_curr, iterations + 1
             
-        if abs(f_curr - f_prev) < epsilon * epsilon:  # Use smaller epsilon for denominator
+        if abs(f_curr - f_prev) < epsilon * epsilon:  # Użyj mniejszego epsilon dla mianownika
             if abs(f_curr) < epsilon:
                 return x_curr, iterations + 1
             return None, iterations + 1
@@ -121,12 +121,12 @@ def secant_method(
         try:
             x_next = x_curr - f_curr * (x_curr - x_prev) / (f_curr - f_prev)
             
-            # Check if next point is too far (possible asymptote)
+            # Sprawdź czy następny punkt nie jest zbyt daleko (możliwa asymptota)
             if abs(x_next - x_curr) > (x1 - x0):
-                x_next = (x_curr + x_prev) / 2  # Use bisection step instead
+                x_next = (x_curr + x_prev) / 2  # Użyj kroku bisekcji zamiast tego
                 
         except (ValueError, OverflowError, ZeroDivisionError):
-            # If division fails, try a smaller step
+            # Jeśli dzielenie się nie powiedzie, spróbuj mniejszego kroku
             x_next = (x_curr + x_prev) / 2
         
         if use_epsilon_condition:
@@ -136,14 +136,14 @@ def secant_method(
                 else:
                     return None, iterations + 1
         
-        # Keep x_next within the original interval
+        # Utrzymuj x_next w oryginalnym przedziale
         x_next = max(min(x_next, max(x0, x1)), min(x0, x1))
         
         x_prev = x_curr
         x_curr = x_next
         iterations += 1
     
-    # Final check if we found a root
+    # Końcowe sprawdzenie czy znaleziono pierwiastek
     try:
         if abs(f(x_curr)) < epsilon:
             return x_curr, iterations

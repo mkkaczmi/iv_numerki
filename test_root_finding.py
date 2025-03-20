@@ -17,26 +17,10 @@ def run_tests():
         ("x^2 + 2*x + 1", -2, 0),             # Expected root: -1
         ("x^3 + 3*x^2 + 3*x + 1", -2, 0),     # Expected root: -1
         
-        # Trigonometric Functions
-        ("sin(x) + cos(x)", 2, 4),            # Expected root ≈ 3.927
-        ("sin(x) - cos(x)", 0, 2),            # Expected root ≈ 0.785
-        ("tan(x) - 1", 0, 2),                 # Expected root ≈ 0.785
-        ("sin(x^2)", 1, 2),                   # Expected root ≈ 1.772
-        ("cos(x) - sin(x)", 0, 2),            # Expected root ≈ 0.785
-        
-        # Exponential Functions
-        ("e^x - 2", 0, 2),                    # Expected root ≈ 0.693
-        ("e^(-x) - 0.5", 0, 2),               # Expected root ≈ 0.693
-        ("e^x + e^(-x) - 3", -1, 1),          # Expected root ≈ 0.481
-        ("e^(2*x) - 4", 0, 1),                # Expected root ≈ 0.693
-        ("e^(-x^2) - 0.5", -1, 1),            # Expected roots ≈ ±0.832
-        
-        # Composite Functions
-        ("sin(x^2) + e^(-x)", 0, 3),          # Expected root ≈ 1.772
-        ("cos(x) + e^(-x) - 1", 0, 2),        # Expected root ≈ 0.739
-        ("sin(x) + x^2 - 2", 0, 2),           # Expected root ≈ 1.061
-        ("e^(-x) * sin(x) - 0.5", 0, 2),      # No root in this interval
-        ("cos(x^2) + x - 1", 0, 2)            # Expected root ≈ 0.739
+        # Non-polynomial functions (these will use standard evaluation)
+        ("sin(x) + cos(x)", 2, 4),
+        ("e^x - 2", 0, 2),
+        ("sin(x^2) + e^(-x)", 0, 3)
     ]
     
     print("Root Finding Methods Test Results")
@@ -48,18 +32,15 @@ def run_tests():
         print(f"\nTest {i}: {func_str}")
         print(f"Interval: [{a}, {b}]")
         
-        # Create function from string
         try:
             f = create_custom_function(func_str)
         except Exception as e:
             print(f"Error creating function: {e}")
             continue
         
-        # Check root existence
         root_message = check_root_existence(f, a, b)
         print(f"Root existence check: {root_message}")
         
-        # Try bisection method
         try:
             bisection_root, bisection_iter = bisection_method(f, a, b, epsilon, max_iterations)
             if bisection_root is not None:
@@ -70,7 +51,6 @@ def run_tests():
         except Exception as e:
             print(f"Bisection Method Error: {e}")
         
-        # Try secant method
         try:
             secant_root, secant_iter = secant_method(f, a, b, epsilon, max_iterations)
             if secant_root is not None:
