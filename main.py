@@ -68,10 +68,13 @@ def create_custom_function(expression: str) -> Callable[[float], float]:
     # Jeśli nie jest wielomianem, użyj standardowej metody
     expression = expression.lower()
     
+    # Dodaj operator mnożenia przed 'e^' gdy poprzedza go liczba
+    expression = re.sub(r'(\d)e\^', r'\1*e^', expression)
+    
     # Zamiana e^(-x) i podobnych wyrażeń na exp(-x)
-    expression = re.sub(r'e\^(\([^)]+\))', r'np.exp\1', expression)
-    expression = re.sub(r'e\^(-?x)', r'np.exp(\1)', expression)
-    expression = re.sub(r'e\^(\d+)', r'np.exp(\1)', expression)
+    expression = re.sub(r'e\^(\([^)]+\))', r'exp(\1)', expression)
+    expression = re.sub(r'e\^(-?x)', r'exp(\1)', expression)
+    expression = re.sub(r'e\^(\d+)', r'exp(\1)', expression)
     
     # Zamiana x^n na x**n dla potęgowania
     expression = re.sub(r'x\^(\d+)', r'x**\1', expression)
@@ -101,7 +104,7 @@ def get_user_input() -> Tuple[Callable[[float], float], float, float, float, int
     Pobiera dane wejściowe od użytkownika.
     
     Returns:
-        Krotka zawierająca (wybraną funkcję, początek przedziału, koniec przedziału, epsilon, max iteracje, warunek epsilon)
+        Krotka zawierająca (wybraną funkcję, początek przedziału, koniec przedziału, epsilon, iteracje, warunek epsilon)
     """
     print("\nWybierz metodę wprowadzania:")
     print("1. Użyj predefiniowanej funkcji")
@@ -167,29 +170,9 @@ def get_user_input() -> Tuple[Callable[[float], float], float, float, float, int
         except ValueError:
             print("Proszę wprowadzić prawidłowe liczby.")
     
-    while True:
-        try:
-            epsilon = float(input("Wprowadź tolerancję zbieżności (ε): "))
-            if epsilon <= 0:
-                print("Tolerancja musi być dodatnia.")
-                continue
-            break
-        except ValueError:
-            print("Proszę wprowadzić prawidłową liczbę.")
-    
-    while True:
-        try:
-            max_iterations = int(input("Wprowadź maksymalną liczbę iteracji: "))
-            if max_iterations <= 0:
-                print("Liczba iteracji musi być dodatnia.")
-                continue
-            break
-        except ValueError:
-            print("Proszę wprowadzić prawidłową liczbę.")
-    
     print("\nWybierz warunek zatrzymania:")
     print("1. |x_i - x_(i-1)| < ε")
-    print("2. Maksymalna liczba iteracji")
+    print("2. Wykonaj zadaną liczbę iteracji")
     
     while True:
         try:
@@ -202,7 +185,30 @@ def get_user_input() -> Tuple[Callable[[float], float], float, float, float, int
     
     use_epsilon_condition = (stop_choice == 1)
     
-    return selected_function, a, b, epsilon, max_iterations, use_epsilon_condition
+    if use_epsilon_condition:
+        while True:
+            try:
+                epsilon = float(input("Wprowadź tolerancję zbieżności (ε): "))
+                if epsilon <= 0:
+                    print("Tolerancja musi być dodatnia.")
+                    continue
+                break
+            except ValueError:
+                print("Proszę wprowadzić prawidłową liczbę.")
+        iterations = 100  # Default value for max iterations
+    else:
+        while True:
+            try:
+                iterations = int(input("Wprowadź liczbę iteracji: "))
+                if iterations <= 0:
+                    print("Liczba iteracji musi być dodatnia.")
+                    continue
+                break
+            except ValueError:
+                print("Proszę wprowadzić prawidłową liczbę.")
+        epsilon = 1e-10  # Default small value for epsilon when using iteration count
+    
+    return selected_function, a, b, epsilon, iterations, use_epsilon_condition
 
 def check_root_existence(f: Callable[[float], float], a: float, b: float) -> str:
     """
@@ -243,7 +249,7 @@ def main():
     print("Porównanie metod znajdowania pierwiastków")
     print("========================================")
     
-    f, a, b, epsilon, max_iterations, use_epsilon_condition = get_user_input()
+    f, a, b, epsilon, iterations, use_epsilon_condition = get_user_input()
     
     root_message = check_root_existence(f, a, b)
     print(f"\nSprawdzenie istnienia pierwiastka: {root_message}")
@@ -262,12 +268,12 @@ def main():
     
     try:
         bisection_root, bisection_iterations = bisection_method(
-            f, a, b, epsilon, max_iterations, use_epsilon_condition
+            f, a, b, epsilon, iterations, use_epsilon_condition
         )
         print(f"\nMetoda bisekcji:")
         if bisection_root is not None:
             print(f"Pierwiastek: {bisection_root:.6f}")
-            print(f"Liczba iteracji: {bisection_iterations}")
+            print(f"Wykonano iteracji: {bisection_iterations}")
             print(f"f(pierwiastek) = {f(bisection_root):.10f}")
         else:
             print("Nie znaleziono pierwiastka w podanym przedziale")
@@ -278,12 +284,12 @@ def main():
     
     try:
         secant_root, secant_iterations = secant_method(
-            f, a, b, epsilon, max_iterations, use_epsilon_condition
+            f, a, b, epsilon, iterations, use_epsilon_condition
         )
         print(f"\nMetoda siecznych:")
         if secant_root is not None:
             print(f"Pierwiastek: {secant_root:.6f}")
-            print(f"Liczba iteracji: {secant_iterations}")
+            print(f"Wykonano iteracji: {secant_iterations}")
             print(f"f(pierwiastek) = {f(secant_root):.10f}")
         else:
             print("Nie znaleziono pierwiastka w podanym przedziale")

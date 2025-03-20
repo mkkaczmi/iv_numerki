@@ -6,7 +6,7 @@ def bisection_method(
     a: float,
     b: float,
     epsilon: float,
-    max_iterations: int,
+    iterations: int,
     use_epsilon_condition: bool
 ) -> Tuple[float | None, int]:
     """
@@ -17,11 +17,11 @@ def bisection_method(
         a: Lewy koniec przedziału
         b: Prawy koniec przedziału
         epsilon: Tolerancja zbieżności
-        max_iterations: Maksymalna liczba iteracji
+        iterations: Liczba iteracji do wykonania (używane tylko gdy use_epsilon_condition=False)
         use_epsilon_condition: Jeśli True, użyj warunku |x_i - x_(i-1)| < ε
         
     Returns:
-        Krotka zawierająca (pierwiastek lub None, liczba iteracji)
+        Krotka zawierająca (pierwiastek lub None, liczba wykonanych iteracji)
     """
     try:
         fa = f(a)
@@ -33,50 +33,69 @@ def bisection_method(
     if fa * fb >= 0:
         return None, 0
     
-    iterations = 0
+    i = 0
     x_prev = a
     
-    while iterations < max_iterations:
-        c = (a + b) / 2
-        try:
-            fc = f(c)
-        except (ValueError, OverflowError):
-            # Jeśli funkcja jest nieokreślona w punkcie środkowym, spróbuj punktu nieco na lewo
+    if use_epsilon_condition:
+        # Używaj tylko warunku |x_i - x_(i-1)| < ε
+        while True:
+            c = (a + b) / 2
             try:
-                c = c - epsilon
                 fc = f(c)
             except (ValueError, OverflowError):
-                return None, iterations
-        
-        if use_epsilon_condition:
+                # Jeśli funkcja jest nieokreślona w punkcie środkowym, spróbuj punktu nieco na lewo
+                try:
+                    c = c - epsilon
+                    fc = f(c)
+                except (ValueError, OverflowError):
+                    return None, i
+            
             if abs(c - x_prev) < epsilon:
-                if abs(fc) < epsilon:
-                    return c, iterations + 1
+                return c, i + 1
+                
+            try:
+                if f(a) * fc < 0:
+                    b = c
                 else:
-                    return None, iterations + 1
+                    a = c
+            except (ValueError, OverflowError):
+                return None, i
+                
+            x_prev = c
+            i += 1
+    else:
+        # Wykonaj dokładnie zadaną liczbę iteracji
+        while i < iterations:
+            c = (a + b) / 2
+            try:
+                fc = f(c)
+            except (ValueError, OverflowError):
+                # Jeśli funkcja jest nieokreślona w punkcie środkowym, spróbuj punktu nieco na lewo
+                try:
+                    c = c - epsilon
+                    fc = f(c)
+                except (ValueError, OverflowError):
+                    return None, i
+                    
+            try:
+                if f(a) * fc < 0:
+                    b = c
+                else:
+                    a = c
+            except (ValueError, OverflowError):
+                return None, i
+                
+            x_prev = c
+            i += 1
         
-        if abs(fc) < epsilon:
-            return c, iterations + 1
-            
-        try:
-            if f(a) * fc < 0:
-                b = c
-            else:
-                a = c
-        except (ValueError, OverflowError):
-            return None, iterations
-            
-        x_prev = c
-        iterations += 1
-    
-    return (a + b) / 2, iterations
+        return c, iterations
 
 def secant_method(
     f: Callable[[float], float],
     x0: float,
     x1: float,
     epsilon: float,
-    max_iterations: int,
+    iterations: int,
     use_epsilon_condition: bool
 ) -> Tuple[float | None, int]:
     """
@@ -87,67 +106,91 @@ def secant_method(
         x0: Pierwszy punkt początkowy
         x1: Drugi punkt początkowy
         epsilon: Tolerancja zbieżności
-        max_iterations: Maksymalna liczba iteracji
+        iterations: Liczba iteracji do wykonania (używane tylko gdy use_epsilon_condition=False)
         use_epsilon_condition: Jeśli True, użyj warunku |x_i - x_(i-1)| < ε
         
     Returns:
-        Krotka zawierająca (pierwiastek lub None, liczba iteracji)
+        Krotka zawierająca (pierwiastek lub None, liczba wykonanych iteracji)
     """
-    iterations = 0
+    i = 0
     x_prev = x0
     x_curr = x1
     
     try:
-        f_x0 = f(x0)
-        f_x1 = f(x1)
+        f_prev = f(x_prev)
+        f_curr = f(x_curr)
     except (ValueError, OverflowError):
         return None, 0
     
-    while iterations < max_iterations:
-        try:
-            f_prev = f(x_prev)
-            f_curr = f(x_curr)
-        except (ValueError, OverflowError):
-            return None, iterations
-        
-        if abs(f_curr) < epsilon:
-            return x_curr, iterations + 1
-            
-        if abs(f_curr - f_prev) < epsilon * epsilon:  # Użyj mniejszego epsilon dla mianownika
-            if abs(f_curr) < epsilon:
-                return x_curr, iterations + 1
-            return None, iterations + 1
-            
-        try:
-            x_next = x_curr - f_curr * (x_curr - x_prev) / (f_curr - f_prev)
-            
-            # Sprawdź czy następny punkt nie jest zbyt daleko (możliwa asymptota)
-            if abs(x_next - x_curr) > (x1 - x0):
-                x_next = (x_curr + x_prev) / 2  # Użyj kroku bisekcji zamiast tego
+    if use_epsilon_condition:
+        while True:
+            try:
+                f_prev = f(x_prev)
+                f_curr = f(x_curr)
                 
-        except (ValueError, OverflowError, ZeroDivisionError):
-            # Jeśli dzielenie się nie powiedzie, spróbuj mniejszego kroku
-            x_next = (x_curr + x_prev) / 2
-        
-        if use_epsilon_condition:
-            if abs(x_next - x_curr) < epsilon:
-                if abs(f(x_next)) < epsilon:
-                    return x_next, iterations + 1
+                # Sprawdź czy mianownik nie jest zbyt bliski zeru
+                denominator = f_curr - f_prev
+                if abs(denominator) < 1e-10:  # Zabezpieczenie przed dzieleniem przez zero
+                    # Użyj kroku bisekcji
+                    x_next = (x_curr + x_prev) / 2
                 else:
-                    return None, iterations + 1
+                    x_next = x_curr - f_curr * (x_curr - x_prev) / denominator
+                    
+                    # Sprawdź czy następny punkt nie jest zbyt daleko
+                    if abs(x_next - x_curr) > abs(x1 - x0):
+                        x_next = (x_curr + x_prev) / 2
+                
+            except (ValueError, OverflowError):
+                # W przypadku błędu użyj kroku bisekcji
+                x_next = (x_curr + x_prev) / 2
+            
+            # Utrzymuj x_next w granicach przedziału
+            x_next = max(min(x_next, max(x0, x1)), min(x0, x1))
+            
+            # Sprawdź warunek stopu
+            if abs(x_next - x_curr) < epsilon:
+                try:
+                    f_next = f(x_next)
+                    if not np.isnan(f_next):  # Sprawdź czy wynik jest poprawny
+                        return x_next, i + 1
+                except (ValueError, OverflowError):
+                    pass
+                # Jeśli wynik jest niepoprawny, kontynuuj
+            
+            x_prev = x_curr
+            x_curr = x_next
+            i += 1
+    else:
+        # Wykonaj dokładnie zadaną liczbę iteracji
+        for i in range(iterations):
+            try:
+                f_prev = f(x_prev)
+                f_curr = f(x_curr)
+                
+                # Sprawdź czy mianownik nie jest zbyt bliski zeru
+                denominator = f_curr - f_prev
+                if abs(denominator) < 1e-10:
+                    x_next = (x_curr + x_prev) / 2
+                else:
+                    x_next = x_curr - f_curr * (x_curr - x_prev) / denominator
+                    
+                    if abs(x_next - x_curr) > abs(x1 - x0):
+                        x_next = (x_curr + x_prev) / 2
+                
+            except (ValueError, OverflowError):
+                x_next = (x_curr + x_prev) / 2
+            
+            x_next = max(min(x_next, max(x0, x1)), min(x0, x1))
+            
+            x_prev = x_curr
+            x_curr = x_next
         
-        # Utrzymuj x_next w oryginalnym przedziale
-        x_next = max(min(x_next, max(x0, x1)), min(x0, x1))
+        # Sprawdź czy końcowy wynik jest poprawny
+        try:
+            f_final = f(x_curr)
+            if not np.isnan(f_final):
+                return x_curr, iterations
+        except (ValueError, OverflowError):
+            pass
         
-        x_prev = x_curr
-        x_curr = x_next
-        iterations += 1
-    
-    # Końcowe sprawdzenie czy znaleziono pierwiastek
-    try:
-        if abs(f(x_curr)) < epsilon:
-            return x_curr, iterations
-    except (ValueError, OverflowError):
-        pass
-        
-    return None, iterations
+        return None, iterations
