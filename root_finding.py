@@ -6,8 +6,9 @@ def bisection_method(
     a: float,
     b: float,
     epsilon: float,
-    max_iterations: int
-) -> Tuple[float, int]:
+    max_iterations: int,
+    use_epsilon_condition: bool
+) -> Tuple[float | None, int]:
     """
     Find root using bisection method.
     
@@ -17,32 +18,57 @@ def bisection_method(
         b: Right endpoint of interval
         epsilon: Tolerance for convergence
         max_iterations: Maximum number of iterations
+        use_epsilon_condition: If True, use |x_i - x_(i-1)| < ε condition
         
     Returns:
-        Tuple of (root, number of iterations)
+        Tuple of (root or None, number of iterations)
     """
-    if f(a) * f(b) >= 0:
-        raise ValueError("Function must have opposite signs at endpoints")
+    try:
+        fa = f(a)
+        fb = f(b)
+    except (ValueError, OverflowError):
+        # Handle case where function is undefined at endpoints
+        return None, 0
+        
+    if fa * fb >= 0:
+        return None, 0
     
     iterations = 0
     x_prev = a
     
     while iterations < max_iterations:
         c = (a + b) / 2
-        if abs(c - x_prev) < epsilon:
+        try:
+            fc = f(c)
+        except (ValueError, OverflowError):
+            # If function is undefined at midpoint, try a point slightly to the left
+            try:
+                c = c - epsilon
+                fc = f(c)
+            except (ValueError, OverflowError):
+                return None, iterations
+        
+        if use_epsilon_condition:
+            if abs(c - x_prev) < epsilon:
+                if abs(fc) < epsilon:
+                    return c, iterations + 1
+                else:
+                    return None, iterations + 1
+        
+        if abs(fc) < epsilon:
             return c, iterations + 1
             
-        if f(c) == 0:
-            return c, iterations + 1
-            
-        if f(c) * f(a) < 0:
-            b = c
-        else:
-            a = c
+        try:
+            if f(a) * fc < 0:
+                b = c
+            else:
+                a = c
+        except (ValueError, OverflowError):
+            return None, iterations
             
         x_prev = c
         iterations += 1
-        
+    
     return (a + b) / 2, iterations
 
 def secant_method(
@@ -50,8 +76,9 @@ def secant_method(
     x0: float,
     x1: float,
     epsilon: float,
-    max_iterations: int
-) -> Tuple[float, int]:
+    max_iterations: int,
+    use_epsilon_condition: bool
+) -> Tuple[float | None, int]:
     """
     Find root using secant method.
     
@@ -61,39 +88,66 @@ def secant_method(
         x1: Second initial point
         epsilon: Tolerance for convergence
         max_iterations: Maximum number of iterations
+        use_epsilon_condition: If True, use |x_i - x_(i-1)| < ε condition
         
     Returns:
-        Tuple of (root, number of iterations)
+        Tuple of (root or None, number of iterations)
     """
     iterations = 0
     x_prev = x0
     x_curr = x1
     
+    try:
+        f_x0 = f(x0)
+        f_x1 = f(x1)
+    except (ValueError, OverflowError):
+        return None, 0
+    
     while iterations < max_iterations:
-        f_prev = f(x_prev)
-        f_curr = f(x_curr)
+        try:
+            f_prev = f(x_prev)
+            f_curr = f(x_curr)
+        except (ValueError, OverflowError):
+            return None, iterations
         
-        # Check if we found the root exactly
         if abs(f_curr) < epsilon:
             return x_curr, iterations + 1
-        
-        # Avoid division by very small numbers
-        if abs(f_curr - f_prev) < epsilon:
-            # If function values are very close, take a smaller step
-            x_next = (x_curr + x_prev) / 2
-        else:
-            x_next = x_curr - f_curr * (x_curr - x_prev) / (f_curr - f_prev)
-        
-        # Check for convergence
-        if abs(x_next - x_curr) < epsilon:
-            # Additional check: return the point with smallest function value
-            if abs(f(x_next)) < abs(f_curr):
-                return x_next, iterations + 1
-            else:
+            
+        if abs(f_curr - f_prev) < epsilon * epsilon:  # Use smaller epsilon for denominator
+            if abs(f_curr) < epsilon:
                 return x_curr, iterations + 1
+            return None, iterations + 1
+            
+        try:
+            x_next = x_curr - f_curr * (x_curr - x_prev) / (f_curr - f_prev)
+            
+            # Check if next point is too far (possible asymptote)
+            if abs(x_next - x_curr) > (x1 - x0):
+                x_next = (x_curr + x_prev) / 2  # Use bisection step instead
+                
+        except (ValueError, OverflowError, ZeroDivisionError):
+            # If division fails, try a smaller step
+            x_next = (x_curr + x_prev) / 2
+        
+        if use_epsilon_condition:
+            if abs(x_next - x_curr) < epsilon:
+                if abs(f(x_next)) < epsilon:
+                    return x_next, iterations + 1
+                else:
+                    return None, iterations + 1
+        
+        # Keep x_next within the original interval
+        x_next = max(min(x_next, max(x0, x1)), min(x0, x1))
         
         x_prev = x_curr
         x_curr = x_next
         iterations += 1
     
-    return x_curr, iterations
+    # Final check if we found a root
+    try:
+        if abs(f(x_curr)) < epsilon:
+            return x_curr, iterations
+    except (ValueError, OverflowError):
+        pass
+        
+    return None, iterations

@@ -18,6 +18,11 @@ def create_custom_function(expression: str) -> Callable[[float], float]:
     # Replace mathematical functions with numpy equivalents
     expression = expression.lower()
     
+    # Replace e^(-x) and similar expressions with exp(-x)
+    expression = re.sub(r'e\^(\([^)]+\))', r'exp\1', expression)  # Handle expressions in parentheses
+    expression = re.sub(r'e\^(-?x)', r'exp(\1)', expression)      # Handle -x or x
+    expression = re.sub(r'e\^(\d+)', r'exp(\1)', expression)      # Handle numbers
+    
     # Replace x^n with x**n for power operations
     expression = re.sub(r'x\^(\d+)', r'x**\1', expression)
     expression = re.sub(r'(\d+)\^(\d+)', r'\1**\2', expression)
@@ -36,18 +41,18 @@ def create_custom_function(expression: str) -> Callable[[float], float]:
     # Create a function that evaluates the expression
     def custom_function(x: float) -> float:
         try:
-            return eval(expression)
+            return eval(expression, {"np": np, "x": x})
         except Exception as e:
             raise ValueError(f"Error evaluating function: {e}")
     
     return custom_function
 
-def get_user_input() -> Tuple[Callable[[float], float], float, float, float, int]:
+def get_user_input() -> Tuple[Callable[[float], float], float, float, float, int, bool]:
     """
     Get input from user for function selection and parameters.
     
     Returns:
-        Tuple of (selected function, interval start, interval end, epsilon, max iterations)
+        Tuple of (selected function, interval start, interval end, epsilon, max iterations, use_epsilon_condition)
     """
     print("\nChoose input method:")
     print("1. Use predefined function")
@@ -91,8 +96,8 @@ def get_user_input() -> Tuple[Callable[[float], float], float, float, float, int
                     continue
                     
                 # Basic validation of the expression
-                if not re.match(r'^[0-9x\s\+\-\*\/\^\(\)\.\,\s]+$', expression):
-                    print("Invalid characters in expression. Use only numbers, x, and basic operators.")
+                if not re.match(r'^[0-9x\s\+\-\*\/\^\(\)\.\,a-z\s]+$', expression):
+                    print("Invalid characters in expression. Use only numbers, x, basic operators, and function names.")
                     continue
                     
                 # Test the function with a sample value
@@ -135,7 +140,42 @@ def get_user_input() -> Tuple[Callable[[float], float], float, float, float, int
         except ValueError:
             print("Please enter a valid number.")
     
-    return selected_function, a, b, epsilon, max_iterations
+    print("\nChoose stop condition:")
+    print("1. |x_i - x_(i-1)| < ε")
+    print("2. Maximum number of iterations")
+    
+    while True:
+        try:
+            stop_choice = int(input("\nSelect stop condition (1 or 2): "))
+            if stop_choice in [1, 2]:
+                break
+            print("Invalid choice. Please enter 1 or 2.")
+        except ValueError:
+            print("Please enter a valid number.")
+    
+    use_epsilon_condition = (stop_choice == 1)
+    
+    return selected_function, a, b, epsilon, max_iterations, use_epsilon_condition
+
+def check_root_existence(f: Callable[[float], float], a: float, b: float) -> str:
+    """
+    Check if a root exists in the interval by checking signs at endpoints.
+    
+    Returns:
+        Message describing the situation with roots
+    """
+    fa = f(a)
+    fb = f(b)
+    
+    if fa * fb > 0:
+        return "No root guaranteed in this interval (same signs at endpoints)"
+    elif fa * fb < 0:
+        return "At least one root exists in this interval"
+    else:  # fa * fb == 0
+        if fa == 0:
+            return f"Root found at x = {a}"
+        else:
+            return f"Root found at x = {b}"
 
 def main():
     """Main program function."""
@@ -143,44 +183,64 @@ def main():
     print("==============================")
     
     # Get user input
-    f, a, b, epsilon, max_iterations = get_user_input()
+    f, a, b, epsilon, max_iterations, use_epsilon_condition = get_user_input()
     
-    # Check if function has opposite signs at endpoints
-    if f(a) * f(b) >= 0:
-        print("\nWarning: Function does not have opposite signs at endpoints!")
-        print("This may lead to incorrect results or no convergence.")
-        proceed = input("Do you want to continue? (y/n): ")
+    # Check root existence and print message
+    root_message = check_root_existence(f, a, b)
+    print(f"\nRoot existence check: {root_message}")
+    
+    if "No root guaranteed" in root_message:
+        print("\nWarning: Function has the same sign at both endpoints!")
+        print("This means either:")
+        print("1. There is no root in this interval, or")
+        print("2. There is an even number of roots in this interval")
+        proceed = input("\nDo you want to try finding roots anyway? (y/n): ")
         if proceed.lower() != 'y':
+            # Plot the function without roots to help visualize
+            plot_function_and_roots(f, [], a, b)
             return
     
     print("\nCalculating roots...")
     
     # Find roots using both methods
     try:
-        bisection_root, bisection_iterations = bisection_method(f, a, b, epsilon, max_iterations)
+        bisection_root, bisection_iterations = bisection_method(
+            f, a, b, epsilon, max_iterations, use_epsilon_condition
+        )
         print(f"\nBisection Method:")
-        print(f"Root: {bisection_root:.6f}")
-        print(f"Iterations: {bisection_iterations}")
-        print(f"f(root) = {f(bisection_root):.10f}")
+        if bisection_root is not None:
+            print(f"Root: {bisection_root:.6f}")
+            print(f"Iterations: {bisection_iterations}")
+            print(f"f(root) = {f(bisection_root):.10f}")
+        else:
+            print("No root found in the given interval")
+            print(f"Iterations performed: {bisection_iterations}")
     except ValueError as e:
         print(f"\nBisection Method Error: {e}")
         bisection_root = None
     
     try:
-        # For secant method, use the endpoints of the interval
-        secant_root, secant_iterations = secant_method(f, a, b, epsilon, max_iterations)
+        secant_root, secant_iterations = secant_method(
+            f, a, b, epsilon, max_iterations, use_epsilon_condition
+        )
         print(f"\nSecant Method:")
-        print(f"Root: {secant_root:.6f}")
-        print(f"Iterations: {secant_iterations}")
-        print(f"f(root) = {f(secant_root):.10f}")
+        if secant_root is not None:
+            print(f"Root: {secant_root:.6f}")
+            print(f"Iterations: {secant_iterations}")
+            print(f"f(root) = {f(secant_root):.10f}")
+        else:
+            print("No root found in the given interval")
+            print(f"Iterations performed: {secant_iterations}")
     except Exception as e:
         print(f"\nSecant Method Error: {e}")
         secant_root = None
     
-    # Plot results
+    # Plot results only if roots were found
     roots = [root for root in [bisection_root, secant_root] if root is not None]
     if roots:
         plot_function_and_roots(f, roots, a, b)
+    else:
+        plot_function_and_roots(f, [], a, b)  # Plot function without roots
 
 if __name__ == "__main__":
     main()
