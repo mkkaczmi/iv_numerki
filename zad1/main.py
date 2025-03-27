@@ -1,308 +1,300 @@
-from typing import Tuple, Callable
-from functions import AVAILABLE_FUNCTIONS
-from root_finding import bisection_method, secant_method
-from plotting import plot_function_and_roots
 import numpy as np
-import re
-from horner import evaluate_polynomial
+import matplotlib.pyplot as plt
 
-def create_custom_function(expression: str) -> Callable[[float], float]:
-    """
-    Tworzy funkcję z wyrażenia tekstowego.
+def bisection_method(f, a, b, epsilon, iterations, use_epsilon_condition):
+    try:
+        fa = f(a)
+        fb = f(b)
+    except (ValueError, OverflowError):
+        return None, 0
     
-    Args:
-        expression: Wyrażenie matematyczne jako tekst
-        
-    Returns:
-        Funkcja wyliczająca wartość wyrażenia
-    """
-    # Sprawdź czy wyrażenie jest wielomianem
-    if re.match(r'^[0-9x\s\+\-\*]+$', expression):
-        # Wyciągnij współczynniki wielomianu
-        terms = expression.replace(' ', '').split('+')
-        coefficients = []
-        max_degree = 0
-        
-        # Znajdź maksymalny stopień wielomianu
-        for term in terms:
-            if 'x' in term:
-                if '^' in term:
-                    degree = int(term.split('^')[1])
-                    max_degree = max(max_degree, degree)
-                else:
-                    max_degree = max(max_degree, 1)
-        
-        # Utwórz listę współczynników
-        for i in range(max_degree + 1):
-            coef = 0
-            for term in terms:
-                if 'x' in term:
-                    if '^' in term:
-                        degree = int(term.split('^')[1])
-                        if degree == i:
-                            coef_str = term.split('x')[0]
-                            if coef_str == '':
-                                coef = 1
-                            elif coef_str == '-':
-                                coef = -1
-                            else:
-                                coef = float(coef_str)
-                    elif i == 1:
-                        coef_str = term.split('x')[0]
-                        if coef_str == '':
-                            coef = 1
-                        elif coef_str == '-':
-                            coef = -1
-                        else:
-                            coef = float(coef_str)
-                elif i == 0:
-                    coef = float(term)
-            coefficients.append(coef)
-        
-        # Użyj schematu Hornera
-        def polynomial_function(x: float) -> float:
-            return evaluate_polynomial(x, coefficients, len(coefficients))
-        
-        return polynomial_function
+    if fa * fb >= 0:
+        return None, 0
     
-    # Jeśli nie jest wielomianem, użyj standardowej metody
-    expression = expression.lower()
+    i = 0
+    x_prev = a
     
-    # Dodaj operator mnożenia przed 'e^' gdy poprzedza go liczba
-    expression = re.sub(r'(\d)e\^', r'\1*e^', expression)
-    
-    # Zamiana e^(-x) i podobnych wyrażeń na exp(-x)
-    expression = re.sub(r'e\^(\([^)]+\))', r'exp(\1)', expression)
-    expression = re.sub(r'e\^(-?x)', r'exp(\1)', expression)
-    expression = re.sub(r'e\^(\d+)', r'exp(\1)', expression)
-    
-    # Zamiana x^n na x**n dla potęgowania
-    expression = re.sub(r'x\^(\d+)', r'x**\1', expression)
-    expression = re.sub(r'(\d+)\^(\d+)', r'\1**\2', expression)
-    
-    # Dodanie operatora mnożenia między liczbą a x
-    expression = re.sub(r'(\d+)x', r'\1*x', expression)
-    
-    # Zamiana funkcji matematycznych na odpowiedniki z numpy
-    expression = expression.replace('sin', 'np.sin')
-    expression = expression.replace('cos', 'np.cos')
-    expression = expression.replace('tan', 'np.tan')
-    expression = expression.replace('exp', 'np.exp')
-    expression = expression.replace('log', 'np.log')
-    expression = expression.replace('sqrt', 'np.sqrt')
-    
-    def custom_function(x: float) -> float:
+    while i < iterations:
+        c = (a + b) / 2
         try:
-            return eval(expression, {"np": np, "x": x})
-        except Exception as e:
-            raise ValueError(f"Błąd obliczania funkcji: {e}")
+            fc = f(c)
+        except (ValueError, OverflowError):
+            return None, i
+        
+        if use_epsilon_condition and abs(c - x_prev) < epsilon:
+            return c, i + 1
+        
+        if fc == 0 or abs(fc) < epsilon:
+            return c, i + 1
+        
+        if fa * fc < 0:
+            b = c
+            fb = fc
+        else:
+            a = c
+            fa = fc
+        
+        x_prev = c
+        i += 1
     
-    return custom_function
+    return c, i
 
-def get_user_input() -> Tuple[Callable[[float], float], float, float, float, int, bool]:
-    """
-    Pobiera dane wejściowe od użytkownika.
+def secant_method(f, a, b, epsilon, iterations, use_epsilon_condition):
+    i = 0
+    x_prev = a
+    x_curr = b
     
-    Returns:
-        Krotka zawierająca (wybraną funkcję, początek przedziału, koniec przedziału, epsilon, iteracje, warunek epsilon)
-    """
-    print("\nWybierz metodę wprowadzania:")
-    print("1. Użyj predefiniowanej funkcji")
-    print("2. Wprowadź własną funkcję")
+    try:
+        f_prev = f(x_prev)
+        f_curr = f(x_curr)
+    except (ValueError, OverflowError):
+        return None, 0
     
-    while True:
+    while i < iterations:
         try:
-            input_choice = int(input("\nWybierz metodę wprowadzania (1 lub 2): "))
-            if input_choice in [1, 2]:
-                break
-            print("Nieprawidłowy wybór. Wprowadź 1 lub 2.")
-        except ValueError:
-            print("Proszę wprowadzić prawidłową liczbę.")
+            denominator = f_curr - f_prev
+            if abs(denominator) < 1e-10:
+                return None, i
+            
+            x_next = x_curr - f_curr * (x_curr - x_prev) / denominator
+            f_next = f(x_next)
+        except (ValueError, OverflowError):
+            return None, i
+        
+        if use_epsilon_condition and abs(x_next - x_curr) < epsilon:
+            return x_next, i + 1
+        
+        if abs(f_next) < epsilon:
+            return x_next, i + 1
+        
+        x_prev, f_prev = x_curr, f_curr
+        x_curr, f_curr = x_next, f_next
+        i += 1
     
-    if input_choice == 1:
-        print("\nDostępne predefiniowane funkcje:")
-        for i, name in enumerate(AVAILABLE_FUNCTIONS.keys(), 1):
-            print(f"{i}. {name}")
-        
-        while True:
-            try:
-                choice = int(input("\nWybierz funkcję (wprowadź numer): "))
-                if 1 <= choice <= len(AVAILABLE_FUNCTIONS):
-                    break
-                print("Nieprawidłowy wybór. Spróbuj ponownie.")
-            except ValueError:
-                print("Proszę wprowadzić prawidłową liczbę.")
-        
-        selected_function = list(AVAILABLE_FUNCTIONS.values())[choice - 1]
-    else:
-        print("\nWprowadź funkcję jako wyrażenie matematyczne.")
-        print("Dostępne funkcje: sin, cos, tan, exp, log, sqrt")
-        print("Użyj x jako zmiennej. Przykład: x**2 + 2*x - 1")
-        print("lub sin(x) + cos(x)")
-        
-        while True:
-            try:
-                expression = input("\nWprowadź funkcję: ").strip()
-                if not expression:
-                    print("Wyrażenie nie może być puste.")
-                    continue
-                    
-                if not re.match(r'^[0-9x\s\+\-\*\/\^\(\)\.\,a-z\s]+$', expression):
-                    print("Nieprawidłowe znaki w wyrażeniu. Używaj tylko liczb, x, operatorów i nazw funkcji.")
-                    continue
-                    
-                test_func = create_custom_function(expression)
-                test_func(0.0)
-                selected_function = test_func
-                break
-            except Exception as e:
-                print(f"Nieprawidłowa funkcja: {e}")
-                print("Spróbuj ponownie.")
+    return x_curr, i
+
+def plot_function_and_roots(f, roots_dict, a, b, title = "Funkcja i jej pierwiastek"):
+    x = np.linspace(a, b, 1000)
+    y = []
     
-    while True:
+    # Obliczanie wartości y z zabezpieczeniem przed bardzo dużymi wartościami
+    y_min, y_max = float('inf'), float('-inf')
+    for xi in x:
         try:
-            a = float(input("Wprowadź początek przedziału: "))
-            b = float(input("Wprowadź koniec przedziału: "))
-            if a >= b:
-                print("Początek przedziału musi być mniejszy od końca.")
+            yi = f(xi)
+            # Ograniczenie wartości y do rozsądnego zakresu
+            if abs(yi) > 10:
+                yi = np.sign(yi) * 10
+            y.append(yi)
+            y_min = min(y_min, yi)
+            y_max = max(y_max, yi)
+        except (ValueError, OverflowError):
+            y.append(np.nan)  # Użyj NaN dla nieokreślonych punktów
+    
+    plt.figure(figsize=(10, 6))
+    plt.plot(x, y, 'b-', label='Funkcja')
+    plt.axhline(y=0, color='k', linestyle='--', alpha=0.3)
+    
+    # Rysowanie pierwiastków z różnymi kolorami i etykietami dla każdej metody
+    colors = {'bisekcja': 'red', 'sieczna': 'green'}
+    markers = {'bisekcja': 'o', 'sieczna': 's'}
+    
+    # Rysowanie pierwiastków
+    for method, root in roots_dict.items():
+        if root is not None:
+            try:
+                root_y = f(root)
+                if abs(root_y) > 10:
+                    root_y = np.sign(root_y) * 10
+                plt.plot(root, root_y, 
+                        color=colors[method], 
+                        marker=markers[method], 
+                        label=f'Pierwiastek ({method}): {root:.6f}')
+            except (ValueError, OverflowError):
                 continue
-            break
-        except ValueError:
-            print("Proszę wprowadzić prawidłowe liczby.")
     
-    print("\nWybierz warunek zatrzymania:")
+    # Ustawienie rozsądnych granic osi y
+    y_range = y_max - y_min
+    plt.ylim([max(y_min - 0.1 * y_range, -10), min(y_max + 0.1 * y_range, 10)])
+    
+    plt.title(title)
+    plt.xlabel('x')
+    plt.ylabel('f(x)')
+    plt.grid(True)
+    plt.legend()
+    plt.show()
+
+def evaluate_polynomial(x, coefficients):
+    result = 0
+    for coef in coefficients:
+        result = result * x + coef
+    return result
+
+def polynomial_function(x, coefficients):
+    return evaluate_polynomial(x, coefficients)
+
+def create_polynomial_function(coefficients):
+    return lambda x: polynomial_function(x, coefficients)
+
+def apply_trigonometric(x, trig_type, a, b, c, d):
+    if trig_type == 1:
+        return a * np.sin(b * x + c) + d
+    elif trig_type == 2:
+        return a * np.cos(b * x + c) + d
+    else:
+        return a * np.tan(b * x + c) + d
+
+def apply_exponential(x, exp_type, a, b, c, p=None):
+    if exp_type == 1:
+        return a * np.exp(b * x) + c
+    else:
+        return a * (p ** (b * x)) + c
+
+def create_function(function_type, polynomial_degree):
+    if function_type == 'polynomial':
+        print(f"\nPodaj {polynomial_degree + 1} współczynników (od najwyższego do najniższego stopnia):")
+        coefficients = []
+        for i in range(polynomial_degree + 1):
+            coef = float(input(f"Współczynnik przy x^{polynomial_degree - i}: "))
+            coefficients.append(coef)
+        return create_polynomial_function(coefficients)
+    
+    elif function_type == 'trigonometric':
+        print("\nWybierz funkcję trygonometryczną:")
+        print("1. Sinus (sin)")
+        print("2. Cosinus (cos)")
+        print("3. Tangens (tan)")
+        trig_choice = int(input("Podaj wybór (1-3): "))
+        
+        print("\nPodaj parametry dla funkcji a*f(bx + c) + d")
+        a = float(input("a = "))
+        b = float(input("b = "))
+        c = float(input("c = "))
+        d = float(input("d = "))
+        
+        return lambda x: apply_trigonometric(x, trig_choice, a, b, c, d)
+    
+    elif function_type == 'exponential':
+        print("\nWybierz podstawę funkcji wykładniczej:")
+        print("1. Liczba e (funkcja: a*e^(bx) + c)")
+        print("2. Własna podstawa (funkcja: a*p^(bx) + c)")
+        exp_choice = int(input("Podaj wybór (1-2): "))
+        
+        a = float(input("a = "))
+        b = float(input("b = "))
+        c = float(input("c = "))
+        
+        if exp_choice == 1:
+            return lambda x: apply_exponential(x, exp_choice, a, b, c)
+        else:
+            p = float(input("Podaj podstawę p = "))
+            return lambda x: apply_exponential(x, exp_choice, a, b, c, p)
+
+def get_user_input():
+    print("\nPodaj przedział [a, b]:")
+    a = float(input("a = "))
+    b = float(input("b = "))
+    
+    print("\nWybierz warunek stopu:")
     print("1. |x_i - x_(i-1)| < ε")
-    print("2. Wykonaj zadaną liczbę iteracji")
-    
-    while True:
-        try:
-            stop_choice = int(input("\nWybierz warunek zatrzymania (1 lub 2): "))
-            if stop_choice in [1, 2]:
-                break
-            print("Nieprawidłowy wybór. Wprowadź 1 lub 2.")
-        except ValueError:
-            print("Proszę wprowadzić prawidłową liczbę.")
+    print("2. Liczba iteracji")
+    stop_choice = int(input("Podaj wybór (1-2): "))
     
     use_epsilon_condition = (stop_choice == 1)
-    
     if use_epsilon_condition:
-        while True:
-            try:
-                epsilon = float(input("Wprowadź tolerancję zbieżności (ε): "))
-                if epsilon <= 0:
-                    print("Tolerancja musi być dodatnia.")
-                    continue
-                break
-            except ValueError:
-                print("Proszę wprowadzić prawidłową liczbę.")
-        iterations = 100  # Default value for max iterations
+        epsilon = float(input("Podaj wartość ε: "))
+        iterations = 1000
     else:
-        while True:
-            try:
-                iterations = int(input("Wprowadź liczbę iteracji: "))
-                if iterations <= 0:
-                    print("Liczba iteracji musi być dodatnia.")
-                    continue
-                break
-            except ValueError:
-                print("Proszę wprowadzić prawidłową liczbę.")
-        epsilon = 1e-10  # Default small value for epsilon when using iteration count
-    
-    return selected_function, a, b, epsilon, iterations, use_epsilon_condition
-
-def check_root_existence(f: Callable[[float], float], a: float, b: float) -> str:
-    """
-    Sprawdza czy pierwiastek istnieje w przedziale poprzez sprawdzenie znaków na końcach.
-    
-    Args:
-        f: Funkcja do sprawdzenia
-        a: Lewy koniec przedziału
-        b: Prawy koniec przedziału
+        epsilon = 1e-10
+        iterations = int(input("Podaj liczbę iteracji: "))
         
-    Returns:
-        Komunikat opisujący sytuację z pierwiastkami
-    """
-    try:
-        # Jeśli funkcja jest wielomianem (sprawdzamy przez atrybut __name__)
-        if hasattr(f, '__name__') and 'polynomial' in f.__name__:
-            fa = f(a)  # Używa już schematu Hornera wewnątrz funkcji
-            fb = f(b)
-        else:
-            fa = f(a)
-            fb = f(b)
-            
-        if fa * fb > 0:
-            return "Brak gwarancji pierwiastka w tym przedziale (te same znaki na końcach)"
-        elif fa * fb < 0:
-            return "Co najmniej jeden pierwiastek istnieje w tym przedziale"
-        else:  # fa * fb == 0
-            if fa == 0:
-                return f"Znaleziono pierwiastek w x = {a}"
-            else:
-                return f"Znaleziono pierwiastek w x = {b}"
-                
-    except (ValueError, OverflowError) as e:
-        return f"Błąd przy sprawdzaniu pierwiastków: {e}"
+    return a, b, epsilon, iterations, use_epsilon_condition
+
+def get_example_functions():
+    functions = [
+        lambda x: x**2 - 2*np.exp(2*x),
+        lambda x: 3*np.exp(x) - np.cos(x),
+        lambda x: np.cos(x) + 2*x - 3,
+        lambda x: np.cos(x) + np.exp(-x) - 1
+    ]
+    return functions
+
+def apply_composite_function(x, functions):
+    result = x
+    for f in reversed(functions):
+        result = f(result)
+    return result
 
 def main():
-    """Główna funkcja programu."""
-    print("Porównanie metod znajdowania pierwiastków")
-    print("========================================")
+    print("\nWybierz tryb:")
+    print("1. Użyj przykładowych funkcji")
+    print("2. Wprowadź własną funkcję")
+    mode_choice = int(input("Podaj wybór (1-2): "))
     
-    f, a, b, epsilon, iterations, use_epsilon_condition = get_user_input()
-    
-    root_message = check_root_existence(f, a, b)
-    print(f"\nSprawdzenie istnienia pierwiastka: {root_message}")
-    
-    if "No root guaranteed" in root_message:
-        print("\nOstrzeżenie: Funkcja ma ten sam znak na obu końcach przedziału!")
-        print("To oznacza, że:")
-        print("1. Nie ma pierwiastka w tym przedziale, lub")
-        print("2. Jest parzysta liczba pierwiastków w tym przedziale")
-        proceed = input("\nCzy chcesz kontynuować poszukiwanie pierwiastków? (t/n): ")
-        if proceed.lower() != 't':
-            plot_function_and_roots(f, [], a, b)
-            return
-    
-    print("\nObliczanie pierwiastków...")
-    
-    try:
-        bisection_root, bisection_iterations = bisection_method(
-            f, a, b, epsilon, iterations, use_epsilon_condition
-        )
-        print(f"\nMetoda bisekcji:")
-        if bisection_root is not None:
-            print(f"Pierwiastek: {bisection_root:.6f}")
-            print(f"Wykonano iteracji: {bisection_iterations}")
-            print(f"f(pierwiastek) = {f(bisection_root):.10f}")
-        else:
-            print("Nie znaleziono pierwiastka w podanym przedziale")
-            print(f"Wykonano iteracji: {bisection_iterations}")
-    except ValueError as e:
-        print(f"\nBłąd metody bisekcji: {e}")
-        bisection_root = None
-    
-    try:
-        secant_root, secant_iterations = secant_method(
-            f, a, b, epsilon, iterations, use_epsilon_condition
-        )
-        print(f"\nMetoda siecznych:")
-        if secant_root is not None:
-            print(f"Pierwiastek: {secant_root:.6f}")
-            print(f"Wykonano iteracji: {secant_iterations}")
-            print(f"f(pierwiastek) = {f(secant_root):.10f}")
-        else:
-            print("Nie znaleziono pierwiastka w podanym przedziale")
-            print(f"Wykonano iteracji: {secant_iterations}")
-    except Exception as e:
-        print(f"\nBłąd metody siecznych: {e}")
-        secant_root = None
-    
-    roots = [root for root in [bisection_root, secant_root] if root is not None]
-    if roots:
-        plot_function_and_roots(f, roots, a, b)
+    if mode_choice == 1:
+        print("\nDostępne funkcje przykładowe:")
+        print("1. x² - 2e^(2x)")
+        print("2. 3e^x - cos(x)")
+        print("3. cos(x) + 2x - 3")
+        print("4. cos(x) + e^(-x) - 1")
+        
+        function_choice = int(input("Wybierz funkcję (1-4): ")) - 1
+        example_functions = get_example_functions()
+        composite_function = example_functions[function_choice]
+        
     else:
-        plot_function_and_roots(f, [], a, b)
+        n_compositions = int(input("Podaj liczbę składanych funkcji (1 dla pojedynczej funkcji): "))
+        
+        functions = []
+        for i in range(n_compositions):
+            print(f"\nFunkcja {i+1}:")
+            print("Wybierz typ funkcji:")
+            print("1. Wielomian")
+            print("2. Trygonometryczna (sin/cos/tan)")
+            print("3. Wykładnicza (e^x lub a^x)")
+            
+            choice = int(input("Podaj wybór (1-3): "))
+            function_type = {1: 'polynomial', 2: 'trigonometric', 3: 'exponential'}[choice]
+            
+            polynomial_degree = None
+            if function_type == 'polynomial':
+                polynomial_degree = int(input("Podaj stopień wielomianu: "))
+            
+            f = create_function(function_type, polynomial_degree)
+            functions.append(f)
+        
+        composite_function = lambda x: apply_composite_function(x, functions)
+
+    a, b, epsilon, iterations, use_epsilon_condition = get_user_input()
+    
+    print("\nStosowanie metody bisekcji...")
+    root_bisection, iters_bisection = bisection_method(
+        composite_function, a, b, epsilon, iterations, use_epsilon_condition
+    )
+    
+    print("\nStosowanie metody siecznych...")
+    root_secant, iters_secant = secant_method(
+        composite_function, a, b, epsilon, iterations, use_epsilon_condition
+    )
+    
+    print("\nWyniki:")
+    if root_bisection is not None:
+        print(f"Metoda bisekcji: Pierwiastek = {root_bisection}, Liczba iteracji = {iters_bisection}")
+    else:
+        print("Metoda bisekcji: Nie udało się znaleźć pierwiastka")
+        
+    if root_secant is not None:
+        print(f"Metoda siecznych: Pierwiastek = {root_secant}, Liczba iteracji = {iters_secant}")
+    else:
+        print("Metoda siecznych: Nie udało się znaleźć pierwiastka")
+    
+    roots_dict = {
+        'bisekcja': root_bisection,
+        'sieczna': root_secant
+    }
+    if any(root is not None for root in roots_dict.values()):
+        plot_function_and_roots(composite_function, roots_dict, a, b, 
+                              "Funkcja i jej pierwiastki (Metody bisekcji i siecznych)")
 
 if __name__ == "__main__":
     main()
