@@ -1,30 +1,24 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from typing import List, Callable
 
-# Przykładowe funkcje
-def linear_function(x: float) -> float:
-    return 2 * x + 1
+def compose_functions(functions):
+    def composed(x):
+        result = x
+        for f in reversed(functions):
+            result = f(result)
+        return result
+    return composed
 
-def absolute_function(x: float) -> float:
-    return abs(x)
-
-def polynomial_function(x: float) -> float:
-    return x**3 - 2*x**2 + x - 1
-
-def trigonometric_function(x: float) -> float:
-    return np.sin(x) + np.cos(2*x)
-
-def evaluate_polynomial(x: float, coefficients: List[float]) -> float:
+def evaluate_polynomial(x, coefficients):
     result = 0
     for coef in coefficients:
         result = result * x + coef
     return result
 
-def create_polynomial_function(coefficients: List[float]) -> Callable[[float], float]:
+def create_polynomial_function(coefficients):
     return lambda x: evaluate_polynomial(x, coefficients)
 
-def apply_trigonometric(x: float, trig_type: int, a: float, b: float, c: float, d: float) -> float:
+def apply_trigonometric(x, trig_type, a, b, c, d):
     if trig_type == 1:
         return a * np.sin(b * x + c) + d
     elif trig_type == 2:
@@ -32,7 +26,7 @@ def apply_trigonometric(x: float, trig_type: int, a: float, b: float, c: float, 
     else:
         return a * np.tan(b * x + c) + d
 
-def create_function(function_type: str, polynomial_degree: int = None) -> Callable[[float], float]:
+def create_function(function_type, polynomial_degree=None):
     if function_type == 'polynomial':
         print(f"\nPodaj {polynomial_degree + 1} współczynników (od najwyższego do najniższego stopnia):")
         coefficients = []
@@ -56,7 +50,7 @@ def create_function(function_type: str, polynomial_degree: int = None) -> Callab
         
         return lambda x: apply_trigonometric(x, trig_choice, a, b, c, d)
 
-def calculate_divided_differences(x: List[float], y: List[float]) -> List[float]:
+def calculate_divided_differences(x, y):
     n = len(x)
     f = np.zeros((n, n))
     f[:, 0] = y
@@ -67,7 +61,7 @@ def calculate_divided_differences(x: List[float], y: List[float]) -> List[float]
     
     return f[0, :]
 
-def newton_interpolation(x: List[float], y: List[float], x_eval: float) -> float:
+def newton_interpolation(x, y, x_eval):
     n = len(x)
     f = calculate_divided_differences(x, y)
     result = f[0]
@@ -80,7 +74,7 @@ def newton_interpolation(x: List[float], y: List[float], x_eval: float) -> float
     
     return result
 
-def read_input_from_file(filename: str) -> tuple[List[float], List[float]]:
+def read_input_from_file(filename):
     x = []
     y = []
     with open(filename, 'r') as file:
@@ -91,9 +85,7 @@ def read_input_from_file(filename: str) -> tuple[List[float], List[float]]:
                 y.append(yi)
     return x, y
 
-def plot_interpolation(x_nodes: List[float], y_nodes: List[float], 
-                      original_func: Callable[[float], float], 
-                      a: float, b: float, n_points: int = 1000):
+def plot_interpolation(x_nodes, y_nodes, original_func, a, b, n_points=1000):
     x_plot = np.linspace(a, b, n_points)
     y_original = [original_func(xi) for xi in x_plot]
     y_interpolated = [newton_interpolation(x_nodes, y_nodes, xi) for xi in x_plot]
@@ -110,41 +102,36 @@ def plot_interpolation(x_nodes: List[float], y_nodes: List[float],
     plt.show()
 
 def main():
-    print("\nWybierz tryb:")
-    print("1. Użyj przykładowych funkcji")
-    print("2. Wprowadź własną funkcję")
-    mode_choice = int(input("Podaj wybór (1-2): "))
+    n_compositions = int(input("Podaj liczbę składanych funkcji (1 dla pojedynczej funkcji): "))
+    functions = []
     
-    if mode_choice == 1:
-        print("\nDostępne funkcje przykładowe:")
-        print("1. Funkcja liniowa: 2x + 1")
-        print("2. Funkcja modułowa: |x|")
-        print("3. Funkcja wielomianowa: x^3 - 2x^2 + x - 1")
-        print("4. Funkcja trygonometryczna: sin(x) + cos(2x)")
+    for i in range(n_compositions):
+        print(f"\nFunkcja {i+1}:")
+        print("Wybierz typ funkcji:")
+        print("1. Liniowa")
+        print("2. Modułowa")
+        print("3. Wielomianowa")
+        print("4. Trygonometryczna")
         
-        choice = int(input("Wybierz funkcję (1-4): "))
-        functions = {
-            1: linear_function,
-            2: absolute_function,
-            3: polynomial_function,
-            4: trigonometric_function
-        }
-        selected_function = functions[choice]
-    else:
-        print("\nWybierz typ funkcji:")
-        print("1. Wielomian")
-        print("2. Trygonometryczna")
-        function_type = int(input("Podaj wybór (1-2): "))
+        function_type = int(input("Podaj wybór (1-4): "))
         
         if function_type == 1:
+            print("\nPodaj parametry dla funkcji ax + b")
+            a = float(input("a = "))
+            b = float(input("b = "))
+            functions.append(lambda x, a=a, b=b: a * x + b)
+        elif function_type == 2:
+            functions.append(lambda x: abs(x))
+        elif function_type == 3:
             degree = int(input("Podaj stopień wielomianu: "))
-            selected_function = create_function('polynomial', degree)
+            functions.append(create_function('polynomial', degree))
         else:
-            selected_function = create_function('trigonometric')
+            functions.append(create_function('trigonometric'))
+    
+    selected_function = compose_functions(functions)
     
     a = float(input("Podaj początek przedziału: "))
     b = float(input("Podaj koniec przedziału: "))
-    n = int(input("Podaj liczbę węzłów interpolacji: "))
     
     print("\nWybierz metodę wprowadzania danych:")
     print("1. Wprowadzenie ręczne")
@@ -152,11 +139,14 @@ def main():
     input_choice = int(input("Wybierz opcję (1-2): "))
     
     if input_choice == 1:
+        n = int(input("Podaj liczbę węzłów interpolacji: "))
         x_nodes = np.linspace(a, b, n)
         y_nodes = [selected_function(xi) for xi in x_nodes]
     else:
         filename = input("Podaj nazwę pliku: ")
         x_nodes, y_nodes = read_input_from_file(filename)
+        n = len(x_nodes)
+        print(f"Wczytano {n} węzłów interpolacji z pliku")
     
     plot_interpolation(x_nodes, y_nodes, selected_function, a, b)
 
